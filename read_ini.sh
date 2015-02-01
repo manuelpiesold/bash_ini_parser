@@ -25,7 +25,7 @@ function read_ini()
 			return 1
 		fi
 	}
-	
+
 	function check_ini_file()
 	{
 		if [ ! -r "$INI_FILE" ] ;then
@@ -34,7 +34,7 @@ function read_ini()
 			return 1
 		fi
 	}
-	
+
 	# enable some optional shell behavior (shopt)
 	function pollute_bash()
 	{
@@ -46,7 +46,7 @@ function read_ini()
 		fi
 		shopt -q -s ${SWITCH_SHOPT}
 	}
-	
+
 	# unset all local functions and restore shopt settings before returning
 	# from read_ini()
 	function cleanup_bash()
@@ -54,7 +54,7 @@ function read_ini()
 		shopt -q -u ${SWITCH_SHOPT}
 		unset -f check_prefix check_ini_file pollute_bash cleanup_bash
 	}
-	
+
 	local INI_FILE=""
 	local INI_SECTION=""
 
@@ -140,7 +140,7 @@ function read_ini()
 		cleanup_bash
 		return 0
 	fi
-	
+
 	if ! check_ini_file ;then
 		cleanup_bash
 		return 1
@@ -160,19 +160,18 @@ function read_ini()
 	local LINE_NUM=0
 	local SECTIONS_NUM=0
 	local SECTION=""
-	
+
 	# IFS is used in "read" and we want to switch it within the loop
 	local IFS=$' \t\n'
 	local IFS_OLD="${IFS}"
-	
+
 	# we need some optional shell behavior (shopt) but want to restore
 	# current settings before returning
 	local SWITCH_SHOPT=""
 	pollute_bash
-	
+
 	while read -r line || [ -n "$line" ]
 	do
-#echo line = "$line"
 
 		((LINE_NUM++))
 
@@ -218,7 +217,7 @@ function read_ini()
 		IFS="="
 		read -r VAR VAL <<< "${line}"
 		IFS="${IFS_OLD}"
-		
+
 		# delete spaces around the equal sign (using extglob)
 		VAR="${VAR%%+([[:space:]])}"
 		VAL="${VAL##+([[:space:]])}"
@@ -243,11 +242,23 @@ function read_ini()
 			# remove existing double quotes
 			VAL="${VAL##\"}"
 			VAL="${VAL%%\"}"
+
+			# checking VAL is array
+			if [[ $VAL == *\"* ]]; then
+				VAL=( \"$VAL\" )
+				IS_ARRAY=1
+			fi
 		elif [[ "${VAL}" =~ ^\'.*\'$  ]]
 		then
 			# remove existing single quotes
 			VAL="${VAL##\'}"
 			VAL="${VAL%%\'}"
+
+			# checking VAL is array
+			if [[ $VAL == *\'* ]]; then
+				VAL=( \'$VAL\' )
+				IS_ARRAY=1
+			fi
 		elif [ "$BOOLEANS" = 1 ]
 		then
 			# Value is not enclosed in quotes
@@ -264,21 +275,24 @@ function read_ini()
 					VAL=0
 				;;
 			esac
+
+			# enclose the value in single quotes and escape any
+			# single quotes and backslashes that may be in the value
+			VAL="${VAL//\\/\\\\}"
+			VAL="\$'${VAL//\'/\'}'"
+
 		fi
-		
 
-		# enclose the value in single quotes and escape any
-		# single quotes and backslashes that may be in the value
-		VAL="${VAL//\\/\\\\}"
-		VAL="\$'${VAL//\'/\'}'"
+		if [[ $IS_ARRAY -eq 1 ]]; then
+			eval "$VARNAME=(${VAL[*]})"
+		else
+			eval "$VARNAME=$VAL"
+		fi
 
-		eval "$VARNAME=$VAL"
 	done  <"${INI_FILE}"
-	
+
 	# return also the number of parsed sections
 	eval "$INI_NUMSECTIONS_VARNAME=$SECTIONS_NUM"
 
 	cleanup_bash
 }
-
-
