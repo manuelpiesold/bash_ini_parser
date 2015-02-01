@@ -212,7 +212,7 @@ function read_ini()
 			return 1
 		fi
 
-
+		unset VAR VAL
 		# split line at "=" sign
 		IFS="="
 		read -r VAR VAL <<< "${line}"
